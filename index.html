@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>The Decider</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold: #c9a84c;
+      --gold-light: #f0d080;
+      --gold-dark: #8b6914;
+      --cream: #f5f0e8;
+      --ink: #1a1410;
+      --muted: #6b5a3e;
+      --silver: #a8a8a8;
+      --silver-light: #e0e0e0;
+    }
+
+    body {
+      background-color: var(--ink);
+      color: var(--cream);
+      font-family: 'Courier Prime', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    .corner { position: fixed; width: 80px; height: 80px; opacity: 0.25; }
+    .corner--tl { top: 24px; left: 24px; border-top: 1px solid var(--gold); border-left: 1px solid var(--gold); }
+    .corner--tr { top: 24px; right: 24px; border-top: 1px solid var(--gold); border-right: 1px solid var(--gold); }
+    .corner--bl { bottom: 24px; left: 24px; border-bottom: 1px solid var(--gold); border-left: 1px solid var(--gold); }
+    .corner--br { bottom: 24px; right: 24px; border-bottom: 1px solid var(--gold); border-right: 1px solid var(--gold); }
+
+    /* ── SCREENS ── */
+    .screen {
+      position: relative;
+      z-index: 1;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      width: min(480px, 92vw);
+      animation: fadeUp 0.4s ease forwards;
+    }
+    .screen.active { display: flex; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── TYPE ── */
+    .headline {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      color: var(--gold-light);
+      text-align: center;
+      text-transform: uppercase;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .subline {
+      font-size: 0.63rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    /* ── SETUP ── */
+    .input-group { width: 100%; margin-bottom: 16px; }
+
+    .input-label {
+      display: block;
+      font-size: 0.58rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .text-input {
+      width: 100%;
+      background: transparent;
+      border: 1px solid rgba(201,168,76,0.3);
+      color: var(--cream);
+      font-family: 'Courier Prime', monospace;
+      font-size: 1rem;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .text-input::placeholder { color: rgba(245,240,232,0.2); }
+    .text-input:focus { border-color: var(--gold); }
+
+    .vs-divider {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: var(--gold-dark);
+      text-align: center;
+      margin: 4px 0 20px;
+      letter-spacing: 0.15em;
+    }
+
+    .best-of-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+      text-align: center;
+    }
+
+    .best-of-options {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+
+    .best-of-btn {
+      background: transparent;
+      border: 1px solid rgba(201,168,76,0.3);
+      color: rgba(245,240,232,0.4);
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.85rem;
+      letter-spacing: 0.12em;
+      padding: 10px 22px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .best-of-btn:hover { border-color: var(--gold); color: var(--gold-light); }
+    .best-of-btn.selected {
+      border-color: var(--gold);
+      color: var(--gold-light);
+      background: rgba(201,168,76,0.1);
+    }
+    .best-of-btn.selected::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border: 1px solid rgba(201,168,76,0.2);
+      pointer-events: none;
+    }
+
+    /* ── PRIMARY BTN ── */
+    .primary-btn {
+      background: transparent;
+      border: 1px solid var(--gold);
+      color: var(--gold-light);
+      font-family: 'Courier Prime', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      padding: 14px 40px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+      outline: none;
+    }
+    .primary-btn::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border: 1px solid rgba(201,168,76,0.18);
+      pointer-events: none;
+    }
+    .primary-btn:hover:not(:disabled) { background: rgba(201,168,76,0.08); }
+    .primary-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── BATTLE SCREEN ── */
+    .battle-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 30px;
+      gap: 10px;
+    }
+
+    .combatant { flex: 1; text-align: center; }
+
+    .combatant__name {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(0.85rem, 2.5vw, 1.15rem);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+    .combatant--a .combatant__name { color: var(--gold-light); }
+    .combatant--b .combatant__name { color: var(--silver-light); }
+
+    .combatant__score {
+      font-family: 'Playfair Display', serif;
+      font-size: 3rem;
+      font-weight: 900;
+      line-height: 1;
+      margin-top: 4px;
+    }
+    .combatant--a .combatant__score { color: var(--gold); }
+    .combatant--b .combatant__score { color: var(--silver); }
+
+    .battle-vs {
+      font-family: 'Playfair Display', serif;
+      font-size: 1rem;
+      font-weight: 900;
+      color: var(--gold-dark);
+      letter-spacing: 0.15em;
+      flex-shrink: 0;
+    }
+
+    /* Pip track */
+    .pip-track {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .pip {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 1px solid rgba(201,168,76,0.2);
+      background: transparent;
+      transition: background 0.35s, border-color 0.35s, transform 0.25s;
+    }
+    .pip.won-a { background: var(--gold); border-color: var(--gold); transform: scale(1.15); }
+    .pip.won-b { background: var(--silver); border-color: var(--silver); transform: scale(1.15); }
+
+    /* Coin */
+    .coin-scene {
+      width: 175px;
+      height: 175px;
+      perspective: 800px;
+      margin-bottom: 30px;
+    }
+
+    .coin {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+    }
+
+    .coin.land-a {
+      animation: spinCoin 0.9s cubic-bezier(0.4,0,0.2,1) forwards,
+                 show-a 0s 0.9s forwards;
+    }
+    .coin.land-b {
+      animation: spinCoin 0.9s cubic-bezier(0.4,0,0.2,1) forwards,
+                 show-b 0s 0.9s forwards;
+    }
+
+    @keyframes spinCoin {
+      0%   { transform: rotateY(0deg) rotateX(15deg); }
+      25%  { transform: rotateY(540deg) rotateX(15deg) translateY(-28px); }
+      60%  { transform: rotateY(1080deg) rotateX(15deg) translateY(-8px); }
+      100% { transform: rotateY(1440deg) rotateX(0deg); }
+    }
+    @keyframes show-a { to { transform: rotateY(0deg); } }
+    @keyframes show-b { to { transform: rotateY(180deg); } }
+
+    .face {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      backface-visibility: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 18px;
+    }
+
+    .face--a {
+      background: radial-gradient(circle at 38% 38%, var(--gold-light) 0%, var(--gold) 45%, var(--gold-dark) 100%);
+      box-shadow:
+        inset -6px -6px 18px rgba(0,0,0,0.4),
+        inset 4px 4px 12px rgba(255,255,255,0.2),
+        0 8px 40px rgba(201,168,76,0.35),
+        0 0 0 3px var(--gold-dark);
+    }
+
+    .face--b {
+      background: radial-gradient(circle at 38% 38%, #d8d8d8 0%, var(--silver) 45%, #666 100%);
+      box-shadow:
+        inset -6px -6px 18px rgba(0,0,0,0.4),
+        inset 4px 4px 12px rgba(255,255,255,0.25),
+        0 8px 32px rgba(168,168,168,0.2),
+        0 0 0 3px #777;
+      transform: rotateY(180deg);
+    }
+
+    .face__text {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: clamp(0.7rem, 3vw, 1rem);
+      letter-spacing: 0.03em;
+      text-align: center;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+    .face--a .face__text { color: var(--ink); }
+    .face--b .face__text { color: #1a1a1a; }
+
+    /* Round flash */
+    .round-result { height: 22px; margin-bottom: 24px; text-align: center; }
+    .round-result__text {
+      font-size: 0.65rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: 0;
+      transition: opacity 0.3s 0.95s;
+    }
+    .round-result__text.visible { opacity: 1; }
+
+    .status-line {
+      font-size: 0.58rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+      text-align: center;
+      min-height: 14px;
+    }
+
+    /* ── WINNER SCREEN ── */
+    .winner-badge {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      margin: 0 auto 32px;
+      animation: popIn 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    }
+    .winner-badge--a {
+      background: radial-gradient(circle at 38% 38%, var(--gold-light) 0%, var(--gold) 50%, var(--gold-dark) 100%);
+      box-shadow: 0 0 70px rgba(201,168,76,0.55), 0 0 0 4px var(--gold-dark);
+    }
+    .winner-badge--b {
+      background: radial-gradient(circle at 38% 38%, #d8d8d8 0%, var(--silver) 50%, #666 100%);
+      box-shadow: 0 0 70px rgba(168,168,168,0.45), 0 0 0 4px #777;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.5); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+
+    .winner-badge__text {
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: clamp(0.75rem, 3vw, 1.05rem);
+      color: var(--ink);
+      text-align: center;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .winner-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .winner-name {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(1.8rem, 6vw, 3rem);
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      word-break: break-word;
+      text-align: center;
+    }
+    .winner-name--a { color: var(--gold-light); }
+    .winner-name--b { color: var(--silver-light); }
+
+    .winner-score {
+      font-size: 0.62rem;
+      letter-spacing: 0.25em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .winner-wins {
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(107,90,62,0.55);
+      margin-bottom: 44px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .hint {
+      position: fixed;
+      bottom: 28px;
+      font-size: 0.56rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: rgba(107,90,62,0.4);
+      text-align: center;
+      pointer-events: none;
+      z-index: 2;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="corner corner--tl"></div>
+  <div class="corner corner--tr"></div>
+  <div class="corner corner--bl"></div>
+  <div class="corner corner--br"></div>
+
+  <!-- ══ SETUP ══ -->
+  <div class="screen active" id="screenSetup">
+    <h1 class="headline">The Decider</h1>
+    <p class="subline">let fate settle the matter</p>
+
+    <div class="input-group">
+      <label class="input-label" for="choiceA">Choice One</label>
+      <input class="text-input" id="choiceA" type="text" placeholder="e.g. Pizza" maxlength="24" autocomplete="off"/>
+    </div>
+
+    <div class="vs-divider">vs</div>
+
+    <div class="input-group">
+      <label class="input-label" for="choiceB">Choice Two</label>
+      <input class="text-input" id="choiceB" type="text" placeholder="e.g. Tacos" maxlength="24" autocomplete="off"/>
+    </div>
+
+    <p class="best-of-label" style="margin-top:28px">Best of…</p>
+    <div class="best-of-options">
+      <button class="best-of-btn" data-n="3">3</button>
+      <button class="best-of-btn" data-n="5">5</button>
+      <button class="best-of-btn" data-n="7">7</button>
+      <button class="best-of-btn" data-n="9">9</button>
+    </div>
+
+    <button class="primary-btn" id="startBtn">— Begin —</button>
+  </div>
+
+  <!-- ══ BATTLE ══ -->
+  <div class="screen" id="screenBattle">
+    <div class="battle-header">
+      <div class="combatant combatant--a">
+        <div class="combatant__name" id="nameA">—</div>
+        <div class="combatant__score" id="scoreA">0</div>
+      </div>
+      <div class="battle-vs">vs</div>
+      <div class="combatant combatant--b">
+        <div class="combatant__name" id="nameB">—</div>
+        <div class="combatant__score" id="scoreB">0</div>
+      </div>
+    </div>
+
+    <div class="pip-track" id="pipTrack"></div>
+
+    <div class="coin-scene">
+      <div class="coin" id="coin">
+        <div class="face face--a"><span class="face__text" id="faceA">?</span></div>
+        <div class="face face--b"><span class="face__text" id="faceB">?</span></div>
+      </div>
+    </div>
+
+    <div class="round-result"><span class="round-result__text" id="roundResult"></span></div>
+    <div class="status-line" id="statusLine"></div>
+
+    <button class="primary-btn" id="flipBtn">— Flip —</button>
+    <p style="font-size:0.54rem;letter-spacing:0.2em;color:var(--muted);margin-top:12px;text-transform:uppercase">or press space</p>
+  </div>
+
+  <!-- ══ WINNER ══ -->
+  <div class="screen" id="screenWinner">
+    <div class="winner-badge" id="winnerBadge">
+      <span class="winner-badge__text" id="winnerBadgeText"></span>
+    </div>
+    <p class="winner-label">Winner</p>
+    <p class="winner-name" id="winnerName"></p>
+    <p class="winner-score" id="winnerScoreLine"></p>
+    <p class="winner-wins" id="winnerWinsLine"></p>
+    <div class="btn-row">
+      <button class="primary-btn" id="rematchBtn">— Rematch —</button>
+      <button class="primary-btn" id="newGameBtn">— New Game —</button>
+    </div>
+  </div>
+
+  <p class="hint" id="hint">enter your two choices to begin</p>
+
+  <script>
+    let choiceA = '', choiceB = '', bestOf = 0, toWin = 0;
+    let scoreA = 0, scoreB = 0, round = 0, flipping = false;
+
+    const $ = id => document.getElementById(id);
+
+    // ── Screen management ──
+    function showScreen(name) {
+      ['screenSetup','screenBattle','screenWinner'].forEach(id => {
+        const el = $(id);
+        el.classList.remove('active');
+      });
+      const target = $('screen' + name.charAt(0).toUpperCase() + name.slice(1));
+      target.style.animation = 'none';
+      target.offsetWidth;
+      target.style.animation = '';
+      target.classList.add('active');
+    }
+
+    // ── Best-of selection ──
+    document.querySelectorAll('.best-of-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.best-of-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        bestOf = parseInt(btn.dataset.n);
+      });
+    });
+
+    // ── Start ──
+    $('startBtn').addEventListener('click', () => {
+      const a = $('choiceA').value.trim();
+      const b = $('choiceB').value.trim();
+      if (!a || !b) { alert('Please enter both choices.'); return; }
+      if (!bestOf)  { alert('Please choose Best of 3, 5, 7 or 9.'); return; }
+      choiceA = a;
+      choiceB = b;
+      startBattle();
+    });
+
+    function startBattle() {
+      scoreA = 0; scoreB = 0; round = 0; flipping = false;
+      toWin = Math.ceil(bestOf / 2);
+
+      $('nameA').textContent = choiceA;
+      $('nameB').textContent = choiceB;
+      $('faceA').textContent = choiceA;
+      $('faceB').textContent = choiceB;
+      $('scoreA').textContent = '0';
+      $('scoreB').textContent = '0';
+
+      // Build pip track
+      const track = $('pipTrack');
+      track.innerHTML = '';
+      for (let i = 0; i < bestOf; i++) {
+        const pip = document.createElement('div');
+        pip.className = 'pip';
+        pip.id = 'pip-' + i;
+        track.appendChild(pip);
+      }
+
+      resetCoin();
+      updateStatus();
+      $('roundResult').classList.remove('visible');
+      $('roundResult').textContent = '';
+      $('flipBtn').disabled = false;
+      $('hint').textContent = 'press space or click to flip';
+      showScreen('battle');
+    }
+
+    function resetCoin() {
+      const coin = $('coin');
+      coin.className = 'coin';
+      void coin.offsetWidth;
+    }
+
+    function updateStatus() {
+      $('statusLine').textContent =
+        `Round ${round + 1} of ${bestOf}  ·  First to ${toWin} wins`;
+    }
+
+    // ── Flip ──
+    $('flipBtn').addEventListener('click', doFlip);
+    document.addEventListener('keydown', e => {
+      if ((e.code === 'Space' || e.key === ' ') && $('screenBattle').classList.contains('active')) {
+        e.preventDefault();
+        doFlip();
+      }
+    });
+
+    function doFlip() {
+      if (flipping) return;
+      flipping = true;
+      $('flipBtn').disabled = true;
+
+      const rr = $('roundResult');
+      rr.classList.remove('visible');
+      rr.textContent = '';
+
+      const isA = Math.random() < 0.5;
+      const coin = $('coin');
+      coin.className = 'coin';
+      void coin.offsetWidth;
+      coin.classList.add(isA ? 'land-a' : 'land-b');
+
+      setTimeout(() => {
+        if (isA) scoreA++; else scoreB++;
+        round++;
+
+        $('scoreA').textContent = scoreA;
+        $('scoreB').textContent = scoreB;
+
+        const pip = $('pip-' + (round - 1));
+        if (pip) pip.classList.add(isA ? 'won-a' : 'won-b');
+
+        rr.textContent = (isA ? choiceA : choiceB) + ' wins the flip';
+        rr.classList.add('visible');
+
+        // Check winner
+        if (scoreA >= toWin || scoreB >= toWin) {
+          setTimeout(() => revealWinner(isA ? 'a' : 'b'), 900);
+        } else {
+          updateStatus();
+          $('flipBtn').disabled = false;
+          flipping = false;
+        }
+      }, 950);
+    }
+
+    // ── Winner reveal ──
+    function revealWinner(side) {
+      const aWon = side === 'a';
+      const winnerName = aWon ? choiceA : choiceB;
+      const wScore = aWon ? scoreA : scoreB;
+      const lScore = aWon ? scoreB : scoreA;
+
+      const badge = $('winnerBadge');
+      badge.className = `winner-badge winner-badge--${side}`;
+      $('winnerBadgeText').textContent = winnerName;
+
+      const wn = $('winnerName');
+      wn.textContent = winnerName;
+      wn.className = `winner-name winner-name--${side}`;
+
+      $('winnerScoreLine').textContent = `${wScore} – ${lScore}`;
+      $('winnerWinsLine').textContent = `Best of ${bestOf} · ${winnerName} wins!`;
+
+      $('hint').textContent = '';
+      showScreen('winner');
+    }
+
+    // ── Rematch / New Game ──
+    $('rematchBtn').addEventListener('click', startBattle);
+
+    $('newGameBtn').addEventListener('click', () => {
+      $('choiceA').value = '';
+      $('choiceB').value = '';
+      bestOf = 0;
+      document.querySelectorAll('.best-of-btn').forEach(b => b.classList.remove('selected'));
+      $('hint').textContent = 'enter your two choices to begin';
+      showScreen('setup');
+    });
+  </script>
+</body>
+</html>
